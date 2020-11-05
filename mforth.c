@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include "serial.h"
 #include "Shared.h"
 #include "forth-vm.h"
 
@@ -16,7 +17,20 @@ char input_buf[BUF_SZ];
 FILE *input_fp = NULL;
 FILE *input_stack[16];
 int input_SP = 0;
+int isBye = 0;
 
+SERIAL_T SerialPort;
+#define FORTH_PORT 1
+#define USER_PORT  0
+
+extern int txToForth(char);
+extern char rxFromForth();
+extern char rxFromUser();
+extern void txToUser_String(char *);
+
+// ---------------------------------------------------------------------
+// ---------------------------------------------------------------------
+// ---------------------------------------------------------------------
 OPCODE_T opcodes[] = {
           { NOP,           "nop",           }
         , { LITERAL,       "LITERAL",       }
@@ -109,25 +123,27 @@ int StrLen(char *src)
 }
 
 // ---------------------------------------------------------------------
-char *get_word(char *stream, char *word)
+char *get_word(char *word)
 {
 	*word = (char)0;
 
 	// skip any leading WS
-	while (*stream < (char)33)
+	char c = rxFromUser();
+	while (c < 33)
 	{
 		// NULL means end of stream
-		if (*stream == (char)0) return (char *)0;
-		++stream;
+		if (!c) return (char *)0;
+		c = rxFromUser();
 	}
 
-	while (*stream > (char)32)
+	while (c > 32)
 	{
-		*(word++) = *(stream++);
+		*(word++) = c;
+		c = rxFromUser();
 	}
 	*word = (char)0;
 
-	return stream;
+	return word;
 }
 
 // ---------------------------------------------------------------------
@@ -182,7 +198,7 @@ bool is_number(char *word, CELL *num)
 	bool is_neg = false;
 	CELL my_num = 0;
 
-	if ((word[0] == '\'')&& (word[2] == '\'')&& (word[3] == (char)0))
+	if ((word[0] == '\'') && (word[2] == '\'') && (word[3] == (char)0))
 	{
 		*num = word[1];
 		return true;
@@ -226,26 +242,26 @@ bool is_number(char *word, CELL *num)
 }
 
 // ---------------------------------------------------------------------
-char *parse_word(char *word, char *stream)
+void parse_word(char *word)
 {
 	if ((*word == '\\') && (*(word+1) == 0))
 	{
-		while (*stream > (char)31) ++stream;
-		return stream;
+		while (rxFromUser()) { }
+		return;
 	}
 
 	if ((*word == '(') && (*(word+1) == 0))
 	{
-		while (*stream != ')') ++stream;
-		return ++stream;
+		while (rxFromUser() != ')') ;
+		return;
 	}
 
 	if ((*word == ':') && (*(word+1) == 0))
 	{
-		stream = get_word(stream, word);
+		get_word(word);
 		define_word(word);
 		STATE = 1;
-		return stream;
+		return;
 	}
 
 	if ((*word == ';') && (*(word+1) == 0))
@@ -257,21 +273,21 @@ char *parse_word(char *word, char *stream)
 			ccomma(RET);
 		
 		STATE = 0;
-		return stream;
+		return;
 	}
 
 	if (strcmpi(word, "dw") == 0)
 	{
-		stream = get_word(stream, word);
+		get_word(word);
 		define_word(word);
-		return stream;
+		return;
 	}
 
 	if (strcmpi(word, "forget") == 0)
 	{
 		HERE = the_words[num_words].XT;
 		num_words--;
-		return stream;
+		return;
 	}
 
 	if (strcmpi(word, "load") == 0) {
@@ -279,12 +295,19 @@ char *parse_word(char *word, char *stream)
 		sprintf(fn, "block-%05d.fs", pop());
 		FILE *fp = fopen(fn, "rt");
 		if (!fp) {
-			printf("File '%s' not found", fn);
+			char buf[64];
+			sprintf("File '%s' not found", fn);
+			txToUser_String(buf);
 		} else {
 			input_stack[input_SP++] = input_fp;
 			input_fp = fp;
 		}
-		return stream;
+		return;
+	}
+
+	if (strcmpi(word, "bye") == 0) {
+		isBye = 1;
+		return;
 	}
 
 	DICT_T *ep = find_word(word);
@@ -300,7 +323,7 @@ char *parse_word(char *word, char *stream)
 			comma(ep->XT);
 		}
 		
-		return stream;
+		return;
 	}
 
 	OPCODE_T *op = find_opcode(word);
@@ -317,7 +340,7 @@ char *parse_word(char *word, char *stream)
 			ccomma(op->opcode);
 		}
 		
-		return stream;
+		return;
 	}
 
 	CELL the_num;
@@ -337,29 +360,39 @@ char *parse_word(char *word, char *stream)
 				comma(pop());
 			}
 		}
-		return stream;
+		return;
 	}
 
-	printf(" %s ??", word);
-	*stream = (char)0;
-	return stream;
+	txToUser_String(word);
+	txToUser_String(" ??");
+	return;
 }
 
 // ---------------------------------------------------------------------
-int execute(char *stream)
+void forthOuterInterpreter()
 {
 	char word[64];
 	while (true)
 	{
-		stream = get_word(stream, word);
-		if (stream == NULL) break;
-		if (strcmpi(word, "bye") == 0) { return 1; }
-		stream = parse_word(word, stream);
+		get_word(word);
+		if (word[0] == 0) return;
+		parse_word(word);
+		if (isBye) return;
 	}
+	return;
+}
 
-	the_memory[0] = JMP;
-	SETAT(1, the_words[num_words].XT);
-	return 0;
+// ---------------------------------------------------------------------
+// The REPL (Read, Execute, Print, Loop) loop ...
+// ---------------------------------------------------------------------
+// ---------------------------------------------------------------------
+void execute(char *line)
+{
+	// Serial_status(&SerialPort);
+	while (*line) txToForth(*(line++));
+	// Serial_status(&SerialPort);
+
+	forthOuterInterpreter();
 }
 
 // ---------------------------------------------------------------------
@@ -416,7 +449,7 @@ void dump_memory(FILE *fp)
 }
 
 // ---------------------------------------------------------------------
-void write_output() 
+void write_output()
 {
 	FILE *fp = NULL;
 	CELL bin_sz = 0, start = (CELL)(&the_memory[0]);
@@ -460,7 +493,7 @@ void write_output()
 }
 
 // ---------------------------------------------------------------------
-bool read()
+int read()
 {
 	if (input_fp)
 	{
@@ -471,10 +504,10 @@ bool read()
 			input_fp = input_stack[--input_SP];
 		}
 		StrCpy(input_buf, "");
-		return true;
+		return 1;
 	}
 	gets(input_buf);
-	return false;
+	return 0;
 }
 
 void doHist(char *line, int addTS) {
@@ -496,7 +529,6 @@ void doHist(char *line, int addTS) {
 void REPL()
 {
 	FILE *fp = NULL;
-	int isBye = 0;
 	open_file(".log", "at", &fp);
 	doHist("\\ new session: ", 1);
 	while (! isBye)
@@ -506,8 +538,16 @@ void REPL()
 		if (input_buf[0] && (!input_fp)) {
 			doHist(input_buf, 0);
 		}
-		if (strcmpi(input_buf, "bye") == 0) { break; }
-		isBye = execute(input_buf);
+		execute(input_buf);
+		char c = rxFromForth();
+		while (c) {
+			if (c == '\n') {
+				printf("\n");
+			} else {
+				printf("%c", (c < 32) ?  '.' : c);
+			}
+			c = rxFromForth();
+		}
 	}
 }
 
@@ -555,6 +595,90 @@ void parse_arg(char *arg)
 }
 
 // ---------------------------------------------------------------------
+// ---------------------------------------------------------------------
+// ---------------------------------------------------------------------
+
+
+// ---------------------------------------------------------------------
+//  ... Forth side
+// ---------------------------------------------------------------------
+char rxFromUser() {
+	char c = Serial_read(&SerialPort, FORTH_PORT);
+	// printf("(fromUser[%d])", c);
+	// return Serial_read(&SerialPort, FORTH_PORT);
+	return c;
+}
+
+int txToUser(char c) {
+	// Serial_write(&SerialPort, c, SERIAL_LTOR);
+	if (c) printf("%c", c);
+}
+
+void txToUser_String(char *str)
+{
+	char *cp = str;
+	while (*cp) txToUser(*(cp++));
+}
+
+// ---------------------------------------------------------------------
+//  ... User side
+// ---------------------------------------------------------------------
+int txToForth(char c) {
+	// printf("(to4th[%d])", c);
+	return Serial_write(&SerialPort, c, SERIAL_RTOL);
+}
+
+int txToForth_String(char *str) {
+	char *cp = str;
+	while (*cp) txToForth(*(cp++));
+}
+
+char rxFromForth() {
+	char c = Serial_read(&SerialPort, USER_PORT);
+	// printf("(from4th[%d])", c);
+	return c;
+	// return Serial_read(&SerialPort, USER_PORT);
+}
+
+// ---------------------------------------------------------------------
+//  ... User side
+// ---------------------------------------------------------------------
+void testSerial() {
+	RINGBUF_T rb;
+	ringbuf_init(&rb);
+	ringbuf_dump(&rb);
+	ringbuf_in(&rb, '9');
+	ringbuf_dump(&rb);
+	char c1 = ringbuf_out(&rb);
+	printf("%s: c=%d\n", (c1 == '9') ? "ok" : "fail", c1);
+	ringbuf_dump(&rb);
+
+	Serial_status(&SerialPort);
+	txToForth_String("123");
+	Serial_status(&SerialPort);
+	txToUser_String("456");
+	Serial_status(&SerialPort);
+
+	printf("Test rxFromUser() ...");
+	char c = rxFromUser();
+	while (c) {
+		printf("%c", c);
+		c = rxFromUser();
+	}
+	Serial_status(&SerialPort);
+
+	printf("\nTest rxFromForth() ...");
+	c = rxFromForth();
+	while (c) {
+		printf("%c", c);
+		c = rxFromForth();
+	}
+	Serial_status(&SerialPort);
+}
+
+// ---------------------------------------------------------------------
+// ---------------------------------------------------------------------
+// ---------------------------------------------------------------------
 int main (int argc, char **argv)
 {
 	char fn[64];
@@ -565,6 +689,11 @@ int main (int argc, char **argv)
 	StrCpy(base_fn, "mforth");
 	HERE = (CELL)the_memory;
 	BASE = 10;
+
+	Serial_init(&SerialPort);
+
+	// testSerial();
+	// exit(0);
 
     for (int i = 1; i < argc; i++)
     {

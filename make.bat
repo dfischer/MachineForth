@@ -6,8 +6,8 @@ goto unknown
 
 :make-mf
 set output=mforth
-set c-files=mforth.c 
-set c-files=%c-files% forth-vm.c
+set c-files=mforth.c
+set c-files=%c-files% forth-vm.c serial.c
 echo gcc -Ofast -o %output% %c-files%
 gcc -Ofast -o %output% %c-files%
 if "--%2%--" == "--1--" mforth -b

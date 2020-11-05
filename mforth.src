@@ -29,7 +29,7 @@ dw d $01 c, (h) @ 0 , #17 c, dw (d) $01 c, , #17 c,
 : !+ d ! d 4 + >d ; : c!+ d c! d 1+ >d ;
 
 \ core words
-: space $20 emit ; : bl $20 ; : cr #13 emit #10 emit ;
+: space $20 emit ; : bl $20 ; : cr #10 emit ;
 : . space (.) ;
 : hex $10 base ! ; : decimal #10 base ! ;
 : hex.     base @ hex     swap . base ! ;

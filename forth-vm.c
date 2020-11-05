@@ -1,8 +1,6 @@
 #include <winbase.h>
 #include <windows.h>
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include "Shared.h"
 #include "forth-vm.h"
 
@@ -19,6 +17,11 @@ int num_words = 0;
 
 HANDLE hStdout, hStdin;
 CONSOLE_SCREEN_BUFFER_INFO csbi;
+
+char txBuf[256];
+extern void txToUser(char);
+extern void txToUser_String(char *);
+extern char rxFromUser();
 
 // ---------------------------------------------------------------------
 // The stacks are circular ... no underflow or overflow
@@ -75,6 +78,7 @@ void init_vm()
 		dstk[i] = 0;
 	}
 }
+
 
 // ---------------------------------------------------------------------
 // Where all the fun is ...
@@ -233,7 +237,7 @@ void run_program(CELL start)
 				break;
 
 			case EMIT:
-				putchar((BYTE)pop());
+				txToUser((char)pop());
 				break;
 
 			case OVER:
@@ -252,6 +256,7 @@ void run_program(CELL start)
 				break;
 
 			case GETCH:
+				push(rxFromUser());
 				break;
 
 			case GETS:
@@ -312,11 +317,12 @@ void run_program(CELL start)
 			case DOT:
 				eax = pop();
 				if (BASE == 10)
-					printf("%d", eax);
+					sprintf(txBuf, "%d", eax);
 				else if (BASE == 0x10)
-					printf("%x", eax);
+					sprintf(txBuf, "%x", eax);
 				else
-					printf("(%d in base %d)", eax, BASE);
+					sprintf(txBuf, "%d (in base %d)", eax, BASE);
+				txToUser_String(txBuf);
 				break;
 
 			case HA:
@@ -378,7 +384,8 @@ void run_program(CELL start)
 				return;
 
 			default:
-				printf("unknown instruction [%d] at [%08lx]", IR, PC);
+				sprintf(txBuf, "unknown instruction [%d] at [%08lx]", IR, PC);
+				txToUser_String(txBuf);
 				return;
 		}
 	}
