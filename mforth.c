@@ -305,6 +305,13 @@ void parse_word(char *word)
 		return;
 	}
 
+	if (strcmpi(word, "edit") == 0) {
+		char fn[64];
+		sprintf(fn, "notepad .\\block-%05d.fs", pop());
+		system(fn);
+		return;
+	}
+
 	if (strcmpi(word, "bye") == 0) {
 		isBye = 1;
 		return;
@@ -681,9 +688,6 @@ void testSerial() {
 // ---------------------------------------------------------------------
 int main (int argc, char **argv)
 {
-	char fn[64];
-	FILE *fp;
-
 	hStdin = GetStdHandle(STD_INPUT_HANDLE);
 	hStdout = GetStdHandle(STD_OUTPUT_HANDLE);
 	StrCpy(base_fn, "mforth");
@@ -719,7 +723,7 @@ int main (int argc, char **argv)
 		ccomma(LITERAL);
 		comma((CELL)&the_memory[0]);
 		ccomma(RET);
-		if (!open_file(".SRC", "rt", &input_fp)) return 1;
+		execute("1 load");
 	}
 
 	REPL();
