@@ -14,6 +14,9 @@ dw d $01 c, (h) @ 0 , #17 c, dw (d) $01 c, , #17 c,
 : >s (s) ! ; : >d (d) ! ;
 : here (h) @ ; inline
 
+: [ 0 state ! ; immediate
+: ] 1 state ! ; immediate
+
 \ program control
 : if   #14 c, here 0 , ; immediate
 : else #13 c, here swap 0 , here swap ! ; immediate
@@ -29,14 +32,18 @@ dw d $01 c, (h) @ 0 , #17 c, dw (d) $01 c, , #17 c,
 : !+ d ! d 4 + >d ; : c!+ d c! d 1+ >d ;
 
 \ core words
+: allot here + (here) ! ;
 : space $20 emit ; : bl $20 ; : cr #10 emit ;
 : . space (.) ;
-: hex $10 base ! ; : decimal #10 base ! ;
+: hex $10 base ! ; : decimal #10 base ! ; : binary %10 base ! ;
 : hex.     base @ hex     swap . base ! ;
 : decimal. base @ decimal swap . base ! ;
 : strlen ( a -- n ) >s 0 >r begin c@+ if drop r> 1+ >r then while drop r> ;
 : count ( a1 -- a2 n ) 1+ dup 1- c@ ;
 : type ( addr n -- ) swap >s begin c@+ emit 1- while drop ;
+
+: >> begin swap 2/ swap 1- while drop ;
+: << begin swap 2* swap 1- while drop ;
 
 \ navigating the dictionary
 : >xt @ ; : >flags 4 + c@ ; : >len 5 + ; : >name 6 + ; : >next #36 - ;
@@ -59,3 +66,7 @@ dw d $01 c, (h) @ 0 , #17 c, dw (d) $01 c, , #17 c,
 : bench ( n -- ) timer swap begin 1- while drop timer elapsed ;
 : benches ( n count -- ) begin over bench 1- while drop drop ;
 : main 100 mil 10 benches ;
+
+: w@ dup c@ swap 1+ c@ #8 << or ;
+: w! over over c! swap #8 >> swap 1+ c!  ;
+17 load

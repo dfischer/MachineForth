@@ -79,6 +79,19 @@ void init_vm()
 	}
 }
 
+void dotBase2(unsigned long num, char *txBuf) {
+	char buf[48], *cp = buf+46;
+	int width = 16;
+	*cp = 0;
+	if (num > 0xFFFF) width = 32;
+	for (int i = 0; i < width; i++) {
+		*(--cp) = ('0' + (num&1));
+		num = num >> 1;
+		// if ((i % 4) == 3) *(--cp) = '-';
+	}
+	*(--cp) = '%';
+	strcpy(txBuf, cp);
+}
 
 // ---------------------------------------------------------------------
 // Where all the fun is ...
@@ -319,7 +332,9 @@ void run_program(CELL start)
 				if (BASE == 10)
 					sprintf(txBuf, "%d", eax);
 				else if (BASE == 0x10)
-					sprintf(txBuf, "%x", eax);
+					sprintf(txBuf, "0x%04x", eax);
+				else if (BASE == 2)
+					dotBase2(eax, txBuf);
 				else
 					sprintf(txBuf, "%d (in base %d)", eax, BASE);
 				txToUser_String(txBuf);

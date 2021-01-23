@@ -312,6 +312,16 @@ void parse_word(char *word)
 		return;
 	}
 
+	if (strcmpi(word, "variable") == 0) {
+		get_word(word);
+		define_word(word);
+		ccomma(LITERAL);
+		comma(HERE+5);
+		ccomma(RET);
+		comma(0);
+		return;
+	}
+
 	if (strcmpi(word, "bye") == 0) {
 		isBye = 1;
 		return;
