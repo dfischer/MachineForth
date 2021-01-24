@@ -69,6 +69,7 @@ mforth.bin
 mforth.inf
 mforth.log
 mforth.txt
+mforth.dis
 empty.inf
 empty.bin
 empty.txt

@@ -104,6 +104,7 @@ void run_program(CELL start)
 	while (true)
 	{
         BYTE IR = BYTE_AT(PC++);
+		// printf("-pc=%x,ir=%d-", PC-1, IR);
 
 		switch(IR)
 		{
@@ -139,7 +140,7 @@ void run_program(CELL start)
 				break;
 
 			case DROP:
-				eax = pop();
+				pop();
 				break;
 
 			case DUP:
@@ -152,14 +153,14 @@ void run_program(CELL start)
 				break;
 
 			case JMPZ:
-				if (TOS == 0)
+				if (pop() == 0)
 					PC = CELL_AT(PC);
 				else
 					PC += CELL_SZ;
 				break;
 
 			case JMPNZ:
-				if (TOS != 0)
+				if (pop() != 0)
 					PC = CELL_AT(PC);
 				else
 					PC += CELL_SZ;

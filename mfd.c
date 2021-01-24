@@ -76,13 +76,16 @@ OPCODE_T opcodes[] = {
         , { SWAP,          "SWAP",          }
         , { DROP,          "DROP",          }
         , { DUP,           "DUP",           }
-        , { SLITERAL,      "SLITERAL",      }
-        , { EMIT,          "emit",          }
+        , { LT,            "<",             }
+        , { EQ,            "=",             }
+        , { GT,            ">",             }
         , { JMP,           "JMP",           }
         , { JMPZ,          "JMPZ",          }
         , { JMPNZ,         "JMPNZ",         }
         , { CALL,          "CALL",          }
         , { RET,           "RET",           }
+        , { OVER,          "over",          }
+        , { AND,           "AND",           }
         , { OR,            "OR",            }
         , { XOR,           "XOR",           }
         , { COM,           "COM",           }
@@ -90,16 +93,12 @@ OPCODE_T opcodes[] = {
         , { SUB,           "-",             }
         , { MUL,           "*",             }
         , { DIV,           "/",             }
-        , { LT,            "<",             }
-        , { EQ,            "=",             }
-        , { GT,            ">",             }
-        , { OVER,          "over",          }
-        , { COMPARE,       "COMPARE",       }
         , { DTOR,          ">r",            }
         , { RTOD,          "r>",            }
-        , { AND,           "AND",           }
-        , { GETCH,         "GETCH",         }
-        , { COMPAREI,      "COMPAREI",      }
+        , { HA,            "(h)",           }
+        , { BA,            "base",          }
+        , { SA,            "state",         }
+        , { LA,            "last",          }
         , { SLASHMOD,      "/mod",          }
         , { NOT,           "NOT",           }
         , { RFETCH,        "RFETCH",        }
@@ -109,13 +108,6 @@ OPCODE_T opcodes[] = {
         , { SHIFTLEFT,     "2*",            }
         , { SHIFTRIGHT,    "2/",            }
         , { PLUSSTORE,     "+!",            }
-        , { OPENBLOCK,     "open-block",    }
-        , { CLOSEBLOCK,    "close-block",   }
-        , { DOT,           "(.)",           }
-        , { HA,            "(h)",           }
-        , { BA,            "base",          }
-        , { SA,            "state",         }
-        , { LA,            "last",          }
         , { COMMA,         ",",             }
         , { CCOMMA,        "c,",            }
         , { IMMEDIATE,     "immediate",     }
@@ -124,9 +116,12 @@ OPCODE_T opcodes[] = {
         , { SRC,           "src",           }
         , { TODST,         ">dst",          }
         , { DST,           "dst",           }
+        , { EMIT,          "emit",          }
         , { GOTORC,        "gotorc",        }
         , { CLS,           "cls",           }
         , { GETS,          "gets",          }
+        , { GETCH,         "GETCH",         }
+        , { DOT,           "(.)",           }
         , { BYE,           "BYE",           }
 		, { 0,             0,               }
 };
@@ -225,6 +220,7 @@ void do_dis(FILE *fp)
 			case HA:
 			case BA:
 			case LA:
+			case SA:
 			case LT:
 			case EQ:
 			case GT:
@@ -238,6 +234,7 @@ void do_dis(FILE *fp)
 			case RTOD:
 			case AND:
 			case XOR:
+			case OR:
 			case COM:
 			case DOT:
 			case SLASHMOD:
@@ -309,8 +306,8 @@ void do_dis(FILE *fp)
 				break;
 
 			default:
-				printf("Unknown IR (%d) at PC=%08lx.", IR, PC - 1);
-				return;
+				printf("Unknown IR (%d) at PC=%08lx.", IR, PC + mem_start - 1);
+				break;
 		}
 
 		// printf("%-24s ; %s\n", left, right);

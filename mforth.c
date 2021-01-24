@@ -154,6 +154,7 @@ DICT_T *define_word(char *word)
 	e->XT = HERE;
 	e->len = StrLen(word);
 	StrCpy(e->name, word);
+	// printf("\n[%s] defined at %x", e->name, HERE);
 	return e;
 }
 

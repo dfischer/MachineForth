@@ -16,7 +16,7 @@
 \ ... and each a bit is an additional operation
 
 \ If the top 2 bits are '00', it's a LIT instruction
-\ INSTR-LIT 0000 rsss NNNN NNNN
+\ INSTR-LIT 0010 rsss NNNN NNNN
 \ ... where NNNN NNNN is the value field (8-bits)
 \ ... and r = 1 indicates to also return
 \ ... and each s = 1 means to shift T 8 bits first
@@ -33,13 +33,13 @@ variable t-(HERE) #0 t-(HERE) !
 : t-, t-HERE t-! t-HERE 1+ t-(HERE) ! ;
 : t-lastOp t-HERE 1- t-@ ;
 
-: INSTR-NOOP     $0000 ; \ 0000 xxxx xxxx xxxx
-: INSTR-LIT      $2000 ; \ 0010 rsss NNNN NNNN
-: INSTR-ALU      $4000 ; \ 01aa aaaa aaaa aaaa
-: INSTR-CALL     $8000 ; \ 100A AAAA AAAA AAAA
-: INSTR-JMPZ     $A000 ; \ 101A AAAA AAAA AAAA
-: INSTR-JMPNZ    $C000 ; \ 110A AAAA AAAA AAAA
-: INSTR-JMP      $E000 ; \ 111A AAAA AAAA AAAA
+: INSTR-NOOP     $0000 ;     \ 0000 xxxx xxxx xxxx
+: INSTR-LIT      $2000 ;     \ 0010 rsss NNNN NNNN
+: INSTR-ALU      $4000 ;     \ 01aa aaaa aaaa aaaa
+: INSTR-CALL     $8000 ;     \ 100A AAAA AAAA AAAA
+: INSTR-JMPZ     $A000 ;     \ 101A AAAA AAAA AAAA
+: INSTR-JMPNZ    $C000 ;     \ 110A AAAA AAAA AAAA
+: INSTR-JMP      $E000 ;     \ 111A AAAA AAAA AAAA
 
 : NOOP            INSTR-NOOP     t-, ;
 : LIT   $0FFF and INSTR-LIT   or t-, ;
@@ -90,7 +90,6 @@ variable t-(HERE) #0 t-(HERE) !
 : t>r     N               r+1 d-1     T->R              alu ;
 : tr@     R                       d+1                   alu ;
 : tr>     R           r-1         d+1                   alu ;
-: tret    T     R->PC r-1                               alu ;
 : t>>     N>>T                d-1                       alu ;
 : t<<     N<<T                d-1                       alu ;
 : tand    N&T                 d-1                       alu ;
@@ -100,18 +99,46 @@ variable t-(HERE) #0 t-(HERE) !
 : t=      N=T                 d-1                       alu ;
 : t<      N<T                 d-1                       alu ;
 : tu<     Nu<T                d-1                       alu ;
-: depth   dsp                     d+1                   alu ;
+: tdepth  dsp                     d+1                   alu ;
 \ xxxxxx  N>>T  R->PC r-1 r+1 d-1 d+1 T->R T->N T->[N]  alu ;
 
-: canAddRet? t-lastOp .  0 ;
-: addRet t-lastOp R->PC r-1 or t-HERE 1- t-! ;
-: t-ret canAddRet? if addRet else tret then drop ;
+: isLIT?    t-lastOp $F000 and INSTR-LIT = ;
+: addLITret t-lastOp $0800 or t-HERE 1- t-! ;
 
-: t.1 dup t-@ (.) ',' emit bl emit 1+ ;
+: canMakeJmp? t-lastOp $E000 and INSTR-CALL = ;
+: makeJmp     t-lastOp $1FFF and INSTR-JMP or t-HERE 1- t-! ;
+
+: addRet t-lastOp R->PC r-1 t-HERE 1- t-! ;
+: canAddRet?  
+    t-lastOp $C000 and INSTR-ALU = not if 0 leave then
+    t-lastOp $1C40 and if 0 leave then            \ R->PC | r-1 r+1 | T->R
+    t-lastOp $000F and $000D = if 0 leave then    \ R
+    1 ;
+
+: tret 
+    isLIT?      if addLITret leave then 
+    canMakeJmp? if makeJmp   leave then 
+    canAddRet?  if addRet    leave then 
+    T R->PC r-1 alu ;
+
+: ;; tret ;
+
+: t.1 dup t-@ . ',' emit bl emit 1+ ;
 : t.8 t.1 t.1 t.1 t.1 t.1 t.1 t.1 t.1 cr ;
-: tdump 0 t-sz #8 / begin >r t.8 r> 1- while drop drop ;
+: tdump 0 t-sz #8 / begin >r t.8 r> 1- dup while drop drop ;
 
-: test [ #01 c,  t-HERE , ] CALL ;
-tdup t-ret
+0 JMP
+
+: t1 [ #01 c,  t-HERE , ] CALL ;
+tdup tswap t+ ;;
 : t2 [ #01 c,  t-HERE , ] CALL ;
-: t3 [ #01 c,  t-HERE , ] CALL ;
+tover t1 ;;
+: main [ #01 c,  t-HERE , ] CALL ;
+t2 tdepth t1- t2 ;;
+
+t-HERE 0 t-(HERE) ! 
+main makeJmp
+t-(HERE) ! 
+
+hex tdump
+binary tdump
