@@ -235,6 +235,7 @@ void do_dis(FILE *fp)
 			case AND:
 			case XOR:
 			case OR:
+			case NOT:
 			case COM:
 			case DOT:
 			case SLASHMOD:
